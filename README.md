@@ -1,5 +1,5 @@
 # Key.Net: Keypoint Detection by Handcrafted and Learned CNN Filters
-This repository will contain the PyTorch implementation of Key.Net keypoint detector:
+This repository contains the PyTorch implementation of Key.Net keypoint detector:
 
 ```text
 "Key.Net: Keypoint Detection by Handcrafted and Learned CNN Filters".

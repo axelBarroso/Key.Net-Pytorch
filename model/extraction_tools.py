@@ -9,6 +9,7 @@ from model.HyNet.hynet_model import HyNet
 from model.kornia_tools.utils import custom_pyrdown
 from model.kornia_tools.utils import laf_from_center_scale_ori as to_laf
 from model.kornia_tools.utils import extract_patches_from_pyramid as extract_patch
+from math import ceil
 
 
 def create_result_dir(result_path):
@@ -41,7 +42,8 @@ def remove_borders(score_map, borders):
 
 
 def extract_ms_feats(keynet_model, desc_model, image, factor, s_mult, device,
-                     num_kpts_i=1000, nms=None, down_level=0, up_level=False, im_size=[]):
+                     num_kpts_i=1000, nms=None, down_level=0, up_level=False, im_size=[],
+                     batch_size_desc=1000):
     '''
     Extracts the features for a specific scale level from the pyramid
     :param keynet_model: Key.Net model
@@ -85,12 +87,12 @@ def extract_ms_feats(keynet_model, desc_model, image, factor, s_mult, device,
     # HyNet takes images on the range [0, 255]
     patches = extract_patch(255*image.cpu(), src_laf, PS=32, normalize_lafs_before_extraction=True)[0]
 
-    if len(patches) > 1000:
-        for i_patches in range(len(patches)//1000+1):
+    if len(patches) > batch_size_desc:
+        for i_patches in range(ceil(len(patches)/batch_size_desc)):
             if i_patches == 0:
-                descs = desc_model(patches[:1000].to(device))
+                descs = desc_model(patches[:batch_size_desc].to(device))
             else:
-                descs_tmp = desc_model(patches[1000*i_patches:1000*(i_patches+1)].to(device))
+                descs_tmp = desc_model(patches[batch_size_desc*i_patches:batch_size_desc*(i_patches+1)].to(device))
                 descs = torch.cat([descs, descs_tmp], dim=0)
         descs = descs.cpu().detach().numpy()
     else:
@@ -120,8 +122,10 @@ def compute_kpts_desc(im_path, keynet_model, desc_model, conf, device, num_point
     up_levels = conf['up_levels']
     scale_factor_levels = conf['scale_factor_levels']
     s_mult = conf['s_mult']
+    batch_size_desc = conf['batch_size_dsc']
     nms_size = conf['nms_size']
-    nms = NonMaxSuppression(nms_size=nms_size)
+    thr = conf['nms_thr']
+    nms = NonMaxSuppression(nms_size=nms_size, thr=thr)
 
     # Compute points per level
     point_level = []
@@ -158,7 +162,8 @@ def compute_kpts_desc(im_path, keynet_model, desc_model, conf, device, num_point
 
         src_kp_i, src_dsc_i, im_up = extract_ms_feats(keynet_model, desc_model, im_up, up_factor_kpts,
                                                       s_mult=s_mult, device=device, num_kpts_i=num_points_level,
-                                                      nms=nms, down_level=idx_level+1, up_level=True, im_size=[w, h])
+                                                      nms=nms, down_level=idx_level+1, up_level=True, im_size=[w, h],
+                                                      batch_size_desc=batch_size_desc)
 
         src_kp_i = np.asarray(list(map(lambda x: [x[0], x[1], (1 / scale_factor_levels) ** (1 + idx_level), x[2]], src_kp_i)))
 
@@ -179,7 +184,8 @@ def compute_kpts_desc(im_path, keynet_model, desc_model, conf, device, num_point
 
         src_kp_i, src_dsc_i, im = extract_ms_feats(keynet_model, desc_model, im, scale_factor_levels, s_mult=s_mult,
                                                    device=device, num_kpts_i=num_points_level, nms=nms,
-                                                   down_level=idx_level, im_size=[w, h])
+                                                   down_level=idx_level, im_size=[w, h],
+                                                   batch_size_desc=batch_size_desc)
 
         src_kp_i = np.asarray(list(map(lambda x: [x[0], x[1], scale_factor_levels ** idx_level, x[2]], src_kp_i)))
 
@@ -193,14 +199,12 @@ def compute_kpts_desc(im_path, keynet_model, desc_model, conf, device, num_point
     return src_kp, src_dsc
 
 
-def initialize_networks(conf):
+def initialize_networks(conf, device):
     '''
     It loads the detector and descriptor models
     :param conf: It contains the configuration and weights path of the models
     :return: Key.Net and HyNet models
     '''
-    use_cuda = torch.cuda.is_available()
-    device = torch.device("cuda:0" if use_cuda else "cpu")
     detector_path = conf['weights_detector']
     descriptor_path = conf['weights_descriptor']
 

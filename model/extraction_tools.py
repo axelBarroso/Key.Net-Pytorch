@@ -57,6 +57,7 @@ def extract_ms_feats(keynet_model, desc_model, image, factor, s_mult, device,
     :param down_level: Indicates if images needs to go down one pyramid level
     :param up_level: Indicates if image is an upper scale level
     :param im_size: Original image size
+    :param batch_size_desc: Max number of patches per descriptor model call
     :return: It returns the local features for a specific image level
     '''
 

@@ -19,5 +19,7 @@ keynet_config = {
             'up_levels': 1,
             'scale_factor_levels': np.sqrt(2),
             's_mult': 22,
+            'nms_thr' : 1.124,
+            'batch_size_dsc' : 1000
         },
 }

@@ -46,7 +46,7 @@ def extract_features():
 
     # Read Key.Net model and extraction configuration
     conf = keynet_config[args.config_file]
-    keynet_model, desc_model = initialize_networks(conf)
+    keynet_model, desc_model = initialize_networks(conf, device)
 
     # read image and extract keypoints and descriptors
     f = open(args.list_images, "r")
@@ -65,3 +65,7 @@ def extract_features():
         np.save(result_path + '.dsc', desc)
 
     print('{} feature extraction finished.'.format(args.method_name))
+
+
+if __name__ == "__main__":
+    extract_features()
